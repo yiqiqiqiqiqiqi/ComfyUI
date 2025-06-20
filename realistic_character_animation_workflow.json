@@ -1,0 +1,236 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "type": "LoadVideo",
+      "pos": [50, 50],
+      "inputs": {
+        "video_path": "path/to/your/input_video.mp4",
+        "frame_start": 0,
+        "frame_total": 300
+      },
+      "outputs": [
+        {"name": "VIDEO", "type": "VIDEO"}
+      ]
+    },
+    {
+      "id": "2",
+      "type": "VideoToFrames",
+      "pos": [250, 50],
+      "inputs": {
+        "video": ["1", 0]
+      },
+      "outputs": [
+        {"name": "IMAGES", "type": "IMAGE"}
+      ]
+    },
+    {
+      "id": "3",
+      "type": "SegmentAnything",
+      "pos": [450, 50],
+      "inputs": {
+        "image": ["2", 0],
+        "model": "sam_vit_h.pth",
+        "segment_type": "person"
+      },
+      "outputs": [
+        {"name": "MASKED_IMAGE", "type": "IMAGE"},
+        {"name": "MASK", "type": "MASK"}
+      ]
+    },
+    {
+      "id": "4",
+      "type": "ImageSelect",
+      "pos": [450, 200],
+      "inputs": {
+        "images": ["2", 0],
+        "index": 0
+      },
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE"}
+      ]
+    },
+    {
+      "id": "5",
+      "type": "ControlNetPreprocessor",
+      "pos": [650, 50],
+      "inputs": {
+        "image": ["3", 0],
+        "model": "controlnet_openpose_v1.pth"
+      },
+      "outputs": [
+        {"name": "CONTROL_NET", "type": "CONTROL_NET"}
+      ]
+    },
+    {
+      "id": "6",
+      "type": "ControlNetPreprocessor",
+      "pos": [650, 150],
+      "inputs": {
+        "image": ["3", 0],
+        "model": "controlnet_canny_v1.pth"
+      },
+      "outputs": [
+        {"name": "CONTROL_NET", "type": "CONTROL_NET"}
+      ]
+    },
+    {
+      "id": "7",
+      "type": "IPAdapter",
+      "pos": [650, 250],
+      "inputs": {
+        "image": ["3", 0],
+        "model": "ipadapter_plus_face.pth",
+        "weight": 0.8
+      },
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL"}
+      ]
+    },
+    {
+      "id": "8",
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 300],
+      "inputs": {
+        "ckpt_name": "sd_xl_base_1.0.safetensors"
+      },
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL"},
+        {"name": "CLIP", "type": "CLIP"},
+        {"name": "VAE", "type": "VAE"}
+      ]
+    },
+    {
+      "id": "9",
+      "type": "CLIPTextEncode",
+      "pos": [250, 400],
+      "inputs": {
+        "text": "A realistic person with subtle movements, detailed hair flowing naturally, subtle natural facial expression, cinematic lighting",
+        "clip": ["8", 1]
+      },
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING"}
+      ]
+    },
+    {
+      "id": "10",
+      "type": "CLIPTextEncode",
+      "pos": [250, 500],
+      "inputs": {
+        "text": "exaggerated expression, unnatural motion, blurry, low quality",
+        "clip": ["8", 1]
+      },
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING"}
+      ]
+    },
+    {
+      "id": "11",
+      "type": "KSampler",
+      "pos": [450, 400],
+      "inputs": {
+        "model": ["7", 0],
+        "positive": ["9", 0],
+        "negative": ["10", 0],
+        "latent_image": ["3", 0],
+        "cfg": 7.5,
+        "sampler_name": "euler_ancestral",
+        "scheduler": "normal",
+        "steps": 30,
+        "denoise": 0.6
+      },
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT"}
+      ]
+    },
+    {
+      "id": "12",
+      "type": "ApplyControlNet",
+      "pos": [650, 400],
+      "inputs": {
+        "model": ["11", 0],
+        "control_net": ["5", 0],
+        "strength": 0.4
+      },
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL"}
+      ]
+    },
+    {
+      "id": "13",
+      "type": "ApplyControlNet",
+      "pos": [850, 400],
+      "inputs": {
+        "model": ["12", 0],
+        "control_net": ["6", 0],
+        "strength": 0.3
+      },
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL"}
+      ]
+    },
+    {
+      "id": "14",
+      "type": "InpaintMask",
+      "pos": [1050, 50],
+      "inputs": {
+        "image": ["3", 0],
+        "mask": "hair_region_mask.png"
+      },
+      "outputs": [
+        {"name": "MASK", "type": "MASK"}
+      ]
+    },
+    {
+      "id": "15",
+      "type": "Inpaint",
+      "pos": [1050, 400],
+      "inputs": {
+        "model": ["13", 0],
+        "image": ["3", 0],
+        "mask": ["14", 0],
+        "prompt": "highly detailed hair, flowing naturally, fine strands, realistic physics",
+        "clip": ["8", 1]
+      },
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE"}
+      ]
+    },
+    {
+      "id": "16",
+      "type": "RIFEFrameInterpolation",
+      "pos": [1250, 400],
+      "inputs": {
+        "frames": ["15", 0],
+        "multiplier": 2.0
+      },
+      "outputs": [
+        {"name": "IMAGES", "type": "IMAGE"}
+      ]
+    },
+    {
+      "id": "17",
+      "type": "ImageComposite",
+      "pos": [1450, 400],
+      "inputs": {
+        "foreground": ["16", 0],
+        "background": ["4", 0]
+      },
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE"}
+      ]
+    },
+    {
+      "id": "18",
+      "type": "VideoSave",
+      "pos": [1650, 400],
+      "inputs": {
+        "images": ["17", 0],
+        "output_path": "path/to/output/output_video.mp4",
+        "fps": 30
+      },
+      "outputs": []
+    }
+  ],
+  "edges": []
+}
