@@ -1,7 +1,3 @@
-Certainly! Here's a formal English project introduction based on your content, suitable for use in presentations, reports, or websites:
-
----
-
 ## 🔰 Project Introduction
 
 **Project Title: Cik Siti Wan Kembang — Realistic Character Animation Workflow**
